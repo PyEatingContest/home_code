@@ -30,71 +30,26 @@ rktoken <- config(token = runkeeper_token)
 req <- GET("https://api.runkeeper.com/fitnessActivities?pageSize=250",runkeeper_token, 
            add_headers(Accept = 'application/vnd.com.runkeeper.FitnessActivityFeed+json'))
 runs <- fromJSON(content(req, "text", encoding = "ISO-8859-1"))[["items"]]
-
-##runs <- rbindlist(lapply(runs, as.list))
-runs <- mutate(runs, miles = 3.28084 * total_distance / 5280, secs = round(duration))
+runs <- mutate(runs, miles = round(3.28084 * total_distance / 5280,3), secs = round(duration), total_calories = round(total_calories))
 runs <- mutate(runs, pace = paste((secs / miles) %/% 60, round((secs/ miles) %% 60)))
-
-#runs <- mutate(runs, pace = ms(paste((secs / miles) %/% 60, round((secs/ miles) %% 60))))
 runs <- mutate(runs, date = round_date(dmy_hms(substr(start_time, 6, length(start_time))),'day'))
-runs <- data.table(runs)
-runs <- runs[date > mdy('06/01/2016')]
+runs <- runs %>% filter(date >= mdy('07/01/2016'))
+runs$mile_break <- cut(runs$miles,breaks=c(0,3,6,9,12,15))
+progress.plot <- ggplot(runs, aes(x=date,y=secs/60/miles)) +
+    ggtitle("Run Progress") +
+    geom_line(aes(color=mile_break))
+progress.plot
 
-#runs$m <- with(runs, miles %/% 1)
-runs$m <- with(runs, miles)
-runs$mileage <- cut(runs$m,breaks=c(0,3,3.2,6,6.2,13,13.2,15))
-
-p <- ggplot(runs, aes(x=date,y=secs/60/miles))+geom_line(aes(color=mileage))
-p
-
-##Monthly Pace Analysis
-View(runs[date > mdy('06/30/2016') & order(date)
-          ,.(pace = paste((sum(secs) / sum(miles)) %/% 60, round((sum(secs)/sum(miles)) %% 60))
-          , mileage = sum(miles)
-          , totsecs = sum(secs)
-          , totruns = .N
-          , avgDist = sum(miles)/.N)
-          ,by=.(month(date), year(date))])
-
-calc.distance <- function(activityid){
-    response <- GET(paste0("https://api.runkeeper.com/fitnessActivities/",activityid),runkeeper_token, 
-                    add_headers(Accept = 'application/vnd.com.runkeeper.FitnessActivity+json'))
-    temp.path <- fromJSON(content(response, "text", encoding = "ISO-8859-1"))[["path"]]
-    if (is.null(temp.path)){next}
-    key.cols <- temp.path[,c("latitude","longitude","altitude")]
-    temp.holder <- 0
-    temp.distance <- 0
-    for (i in 1:(nrow(key.cols)-1)) {
-        altitude.change <- abs(key.cols[i,3]-key.cols[i+1,3])
-        direct.distance <- distm(key.cols[i,1:2],key.cols[i+1,1:2], fun=distHaversine)[[1,1]]
-            if(altitude.change!=0){
-                temp.distance <- sqrt(direct.distance^2+altitude.change^2)
-            } else {
-                temp.distance <- direct.distance
-            }
-        temp.holder <- temp.holder + temp.distance
-    }
-    temp.holder <- 3.28084 * temp.holder / 5280 
-    temp.holder
-}
-
-req2 <- GET("https://api.runkeeper.com/fitnessActivities/908951482",runkeeper_token, 
-            add_headers(Accept = 'application/vnd.com.runkeeper.FitnessActivity+json'))
-path <- fromJSON(content(req2, "text", encoding = "ISO-8859-1"))[["path"]]
-
-lla <- path[,c("latitude","longitude","altitude")]
-##Tries to calculate length of run by using GPS coordinates and altitude
-holder <- 0
-distance <- 0
-for (i in 1:(nrow(lla)-1)) {
-    altitude.change <- abs(lla[i,3]-lla[i+1,3])
-    direct.distance <- distm(lla[i,1:2],lla[i+1,1:2], fun=distHaversine)[[1,1]]
-#     if(altitude.change!=0){
-#         distance <- sqrt(direct.distance^2+altitude.change^2)
-#     } else {
-#         distance <- direct.distance
-#     }
-    holder <- holder + direct.distance
-}
-holder <- 3.28084 * holder / 5280 
-holder
+##View of Monthly Activity Analysis
+View(
+    runs %>% 
+        group_by(month = month(date), year = year(date)) %>%
+        summarize(
+            mileage = sum(miles),
+            tot_min = round(sum(secs)/60,2),
+            tot_runs = n(),
+            avg_dist = sum(miles)/n(),
+            avg_pace = paste((sum(secs) / sum(miles)) %/% 60, round((sum(secs)/ sum(miles)) %% 60))
+        ) %>% 
+        arrange(year, month)
+)
