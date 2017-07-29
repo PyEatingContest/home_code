@@ -1,10 +1,8 @@
 library(httr)
-library(dplyr)
 library(ggplot2)
 library(lubridate)
 library(jsonlite)
-library(data.table)
-library(geosphere)
+library(tidyverse)
 
 client_id <- 'edada00d8a004722a6eb6199647595e4'
 client_secret <- 'd9dc9e6c1cba44f68f0b8d3d6e47b5df'
