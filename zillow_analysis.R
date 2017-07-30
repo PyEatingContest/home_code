@@ -4,7 +4,7 @@ library(tidyverse)
 library(lubridate)
 library(ggmap)
 
-zillow.sample.size <- 100
+zillow.sample.size <- 1000
 
 zid <- 'X1-ZWz1ewo9h1s07f_89sjr'
 fields <- c('//zpid', '//street', '//zipcode', '//city', '//state', '//longitude',
@@ -67,6 +67,15 @@ homesDf <- homesDf %>% mutate(last.updated = mdy(`last-updated`),
                               last.sold.date = mdy(lastSoldDate),
                               zillow.value = as.numeric(as.character(amount)),
                               finished.sqft = as.numeric(as.character(finishedSqFt)))
+homesDf <- homesDf %>% mutate(avg.value.per.sqft = zillow.value / finished.sqft)
+
+### Quick boxplot ###
+plot1 <- ggplot(homesDf %>% filter(!is.na(avg.value.per.sqft) & 
+                                       avg.value.per.sqft <=1500 &
+                                       useCode %in% c('Condominium', 'Duplex', 'MultiFamily2To4','SingleFamily','Triplex'))
+                , aes(x=useCode, y=avg.value.per.sqft)) +
+                geom_boxplot()
+plot1
 
 ### Quick summary views of zillow data ###
 homesDf %>% 
