@@ -1,8 +1,10 @@
 library(RCurl)
 library(XML)
-library(plyr)
+library(tidyverse)
 library(lubridate)
 library(ggmap)
+
+zillow.sample.size <- 100
 
 zid <- 'X1-ZWz1ewo9h1s07f_89sjr'
 fields <- c('//zpid', '//street', '//zipcode', '//city', '//state', '//longitude',
@@ -19,17 +21,18 @@ getDSR <- function(adrs, csz){
                  'citystatezip' = csz))
 }
 
-test <- as.vector(read.csv('/Users/stevensandiford/Home data analysis/jpzone.csv'))
-test <- test[,-1] #Remove excess row
-s <- sample(1:nrow(test), 500, replace=FALSE)
-test <- test[s,]
+#test <- as.vector(read.csv('/Users/stevensandiford/Home data analysis/jpzone.csv'))
+test.group <- read_csv('/Users/stevensandiford/Home data analysis/jpzone.csv')
+test.sample <- sample(1:nrow(test.group), zillow.sample.size, replace=FALSE)
+test.group <- test.group[test.sample,]
 
 n <- length(fields)
-nHomes <- nrow(test)
+nHomes <- nrow(test.group)
 
+### Run through sample list and grab Zillow detailed info ###
 list1 <- list()
 for (x in 1:nHomes) {
-  r <- getDSR(test[x,1],'02130')
+  r <- getDSR(test.group[x,2],'02130')
   doc <- xmlTreeParse(r, asText=TRUE, useInternal=TRUE)
   list2 <- list()
   if (xmlValue(doc[['//code']]) != 0) {
@@ -58,16 +61,21 @@ for (x in 1:nHomes) {
 matrix <- do.call(rbind, list1)
 colnames(matrix) <- gsub("//", "", colnames(matrix))
 
-#################
 homesDf <- as.data.frame(matrix)
-#remove properties with no zpid
-homesDf <- subset(homesDf, zpid != 'ERROR' & zpid != 'warning')
-homesDf$Updated <- mdy(homesDf$'last-updated')
-homesDf$LSD <- mdy(homesDf$lastSoldDate)
-homesDf$value <- as.numeric(as.character(homesDf$amount))
-homesDf <- subset(homesDf, homesDf$zipcode=='02130')
+homesDf <- homesDf %>% filter(zpid != 'ERROR' & zpid != 'warning')
+homesDf <- homesDf %>% mutate(last.updated = mdy(`last-updated`), 
+                              last.sold.date = mdy(lastSoldDate),
+                              zillow.value = as.numeric(as.character(amount)),
+                              finished.sqft = as.numeric(as.character(finishedSqFt)))
 
-########
+### Quick summary views of zillow data ###
+homesDf %>% 
+    group_by(useCode) %>% 
+    summarize(avg.size = mean(finished.sqft),
+              avg.value.per.sf = sum(zillow.value, na.rm=T) / sum(finished.sqft, na.rm=T),
+              record.count = n())
+
+### Get Lat/Long for key locations in jamaica plain ###
 sb <- geocode("Stony brook t station, 02130", source = "google")
 gs <- geocode("Green Street t station, 02130", source = "google")
 js <- geocode("Jackson Square, Boston, 02130", source = "google")
