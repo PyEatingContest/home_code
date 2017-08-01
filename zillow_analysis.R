@@ -96,7 +96,8 @@ jpbh <- geocode("507 Jamaicaway, Jamaica Plain, MA 02130", source = "google")
 keyLocs <- rbind(sb,gs,js,wf,sas,csc,jpbh)
 nl_1 <- list()
 
-for (x in 1:5) { #returned 142 rows of data
+### Grab distance from key locations to addressed in homes dataframe ###
+for (x in 4:50) { #returned 142 rows of data
   nl_2 <- list()
   details <- list()
   for (i in 1:nrow(keyLocs)) {
@@ -111,5 +112,14 @@ for (x in 1:5) { #returned 142 rows of data
 m <- do.call(rbind, nl_1)
 colnames(m) <- c('stonybrook', 'green_street', 'wrong_jackson_sq', 'wholefoods',
               'stop_and_shop', 'centre_st_cafe', 'jp_boat_house')
-nrow(homesDf)-142
-newdf <- cbind(homesDf[143:nrow(homesDf),], m)
+nrow(m)
+four.to.50 <- cbind(homesDf[4:(nrow(m)+3),], m)
+newdf <- cbind(homesDf[1:nrow(m),], m)
+
+### Add distances to original matched home df ###
+one.to.fifty.homes.df <- rbind(newdf, four.to.50)
+View(one.to.fifty.homes.df)
+
+### Create small subset of condos for modeling ###
+condos <- one.to.fifty.homes.df %>% filter(useCode == 'Condominium')
+View(condos)
