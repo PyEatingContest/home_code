@@ -51,24 +51,67 @@ mass_recode <- mass %>% mutate(sex_of_child = ifelse(csex == 1, "Male", "Female"
                             mass$mage12 == 12 ~ "40 - 44 years",
                             mass$mage12 == 13 ~ "45 - 49 years",
                             mass$mage12 == 14 ~ "50 - 54 years"
+                        )),
+                        birth_order = as.factor(case_when(
+                            mass$livord9 == 1 ~ "First child",
+                            mass$livord9 == 2 ~ "Second child",
+                            mass$livord9 == 3 ~ "Third child",
+                            mass$livord9 == 4 ~ "Fourth child",
+                            mass$livord9 == 5 ~ "Fifth child",
+                            mass$livord9 == 6 ~ "Sixth child",
+                            mass$livord9 == 7 ~ "Seventh child",
+                            mass$livord9 == 8 ~ "Eigth and over child",
+                            mass$livord9 == 9 ~ "Unknown or not stated"
                         ))
                     )
 mass_recode$gest_range <- relevel(mass_recode$gest_range, "Under 20 weeks")
-
+mass_recode$birth_order <- ordered(mass_recode$birth_order, 
+                                   c("First child","Second child", "Third child",
+                                     "Fourth child", "Fifth child", "Sixth child",
+                                     "Seventh child","Eigth and over child","Unknown or not stated"))
 # Visualizations ----------------------------------------------------------
 
 # Births by father's age
-mass %>% 
+mass_recode %>% 
     filter(dfage != 99) %>% 
     ggplot(aes(x = dfage, color = sex_of_child)) +
     geom_freqpoly(alpha = .5, position = 'identity', binwidth = 1) +
     coord_cartesian(xlim = c(15,60))
 
 # Child gender ratio based on father's age
-mass %>% 
+mass_recode %>% 
     filter(dfage != 99, dfage <=65) %>% 
     group_by(dfage, sex_of_child) %>%
     summarize(n = n()) %>%
     spread(key = sex_of_child, value = n) %>%
     ungroup() %>% 
     mutate(freq = Female / sum(Female, na.rm = T))
+
+# Birth order vs sex
+mass_recode %>% 
+    group_by(sex_of_child, birth_order) %>% 
+    count() %>% 
+    spread(key = sex_of_child, value = n) %>%
+    mutate_each(funs(round(./sum(.)*100,1)), one_of('Female', 'Male')) %>%
+    mutate(cum_male = cumsum(Male), cum_female = cumsum(Female))
+
+# Births by gestation range
+mass_recode %>% 
+    filter(birth_order %in% c('First child', 'Second child', 'Third child')) %>% 
+    group_by(gest_range, birth_order) %>% 
+    count() %>%
+    ggplot(aes(x = gest_range, y = n, fill = birth_order)) + 
+    geom_bar(stat = 'identity', position = 'dodge')
+
+# Births by gestation week
+mass_recode %>%
+    filter(birth_order == 'Second child') %>% 
+    group_by(dgestat) %>% 
+    count() %>%
+    mutate(perc = n / sum(n, na.rm = T) * 100) %>% 
+    ggplot(aes(x = dgestat, y = perc)) + 
+    geom_bar(stat = 'identity') +
+    coord_cartesian(xlim = c(35,42)) + 
+    geom_text(aes(label = round(cumsum(perc),0)), 
+              position = position_stack(vjust = 1.05))
+ 
