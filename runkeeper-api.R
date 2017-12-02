@@ -21,14 +21,14 @@ myapp <- oauth_app("runkeeper",
     key = client_id,
     secret = client_secret)
 
-runkeeper_token <- oauth2.0_token(runkeeper_endpoints, myapp)
+runkeeper_token <- oauth2.0_token(runkeeper_endpoints, myapp, cache = F)
 
 rktoken <- config(token = runkeeper_token)
 
-req <- GET("https://api.runkeeper.com/fitnessActivities?pageSize=300",runkeeper_token, 
-           add_headers(Accept = 'application/vnd.com.runkeeper.FitnessActivityFeed+json'))
+req <- GET("https://api.runkeeper.com/fitnessActivities?pageSize=300",runkeeper_token, add_headers(Accept = 'application/vnd.com.runkeeper.FitnessActivityFeed+json'))
 runs <- fromJSON(content(req, "text", encoding = "ISO-8859-1"))[["items"]]
-runs <- mutate(runs, miles = round(3.28084 * total_distance / 5280,3), secs = round(duration), total_calories = round(total_calories))
+runs <- mutate(runs, miles = round(3.28084 * total_distance / 5280,3),
+               secs = round(duration), total_calories = round(total_calories))
 runs <- mutate(runs, pace = paste((secs / miles) %/% 60, round((secs/ miles) %% 60)))
 runs <- mutate(runs, date = round_date(dmy_hms(substr(start_time, 6, length(start_time))),'day'))
 runs <- runs %>% filter(date >= mdy('07/01/2016'))
@@ -42,7 +42,7 @@ progress.plot
 month_progress <- runs %>% 
     filter(miles > 3) %>% 
     mutate(date_month = round_date(date, 'month')) %>% 
-    group_by(date_month, mile_break) %>%
+    group_by(date_month) %>%
     summarize(miles = sum(miles), hours = sum(secs)/60/60, pace = sum(secs)/60/sum(miles))
 
 ggplot(data = month_progress, aes(x = date_month, color = mile_break)) + 
